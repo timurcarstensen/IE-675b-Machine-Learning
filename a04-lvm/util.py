@@ -6,10 +6,25 @@
 
 import numpy as np
 from numpy.linalg import svd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
 from IPython import get_ipython
+
+
+def logsumexp(x):
+    """Computes log(sum(exp(x)).
+
+    Uses offset trick to reduce risk of numeric over- or underflow. When x is a
+    1D ndarray, computes logsumexp of its entries. When x is a 2D ndarray,
+    computes logsumexp of each column.
+
+    Keyword arguments:
+    x : a 1D or 2D ndarray
+    """
+    offset = np.max(x, axis=0)
+    return offset + np.log(np.sum(np.exp(x - offset), axis=0))
 
 
 def nextplot(force=False):
@@ -130,6 +145,7 @@ def plot_xy(x, y, z=None, aspect=1.0, axis=None, **kwargs):
     `aspect` sets the aspect ratio of the plot.
 
     If `axis` is set, put the plot on the specified axis.
+
     """
     if not axis:
         nextplot()
@@ -153,17 +169,17 @@ def plot_xy(x, y, z=None, aspect=1.0, axis=None, **kwargs):
                     "#b15928",
                 ]
             )
-            axis.scatter(x, y, c=colors[z], **kwargs)
+            axis.scatter(x, y, c=colors[z % len(colors)], **kwargs)
         else:
             range = np.max(np.abs(z))
             im = axis.scatter(x, y, c=z, cmap="PiYG", vmin=-range, vmax=range, **kwargs)
             plt.colorbar(im, ax=axis)
     else:
-        axis.scatter(x, y)
+        axis.scatter(x, y, **kwargs)
     axis.set_aspect(aspect)
 
 
-def match_categories(categories1, categories2):
+def match_categories(categories1, categories2, return_assignment=False):
     """Match categories of two observation vectors.
 
     Takes two vectors of categorical observations; both vectors must have the same
@@ -199,4 +215,41 @@ def match_categories(categories1, categories2):
     result = categories1.copy()
     for j in range(C):
         result[categories2 == u2[j]] = u1[row[np.argmax(col == j)]]
-    return result
+    if return_assignment:
+        return result, row, col
+    else:
+        return result
+
+
+# MNIST utilities
+
+def showdigit(x):
+    "Show one digit as a gray-scale image."
+    plt.imshow(x.reshape(28, 28), norm=mpl.colors.Normalize(0, 255), cmap="gray")
+
+
+def showdigits(X, y, max_digits=15):
+    "Show up to max_digits random digits per class from X with class labels from y."
+    num_cols = min(max_digits, max(np.bincount(y)))
+    for c in range(10):
+        ii = np.where(y == c)[0]
+        if len(ii) > max_digits:
+            ii = np.random.choice(ii, size=max_digits, replace=False)
+        for j in range(num_cols):
+            ax = plt.gcf().add_subplot(
+                10, num_cols, c * num_cols + j + 1, aspect="equal"
+            )
+            ax.get_xaxis().set_visible(False)
+            if j == 0:
+                ax.set_ylabel(c)
+                ax.set_yticks([])
+            else:
+                ax.get_yaxis().set_visible(False)
+            if j < len(ii):
+                ax.imshow(
+                    X[ii[j],].reshape(28, 28),
+                    norm=mpl.colors.Normalize(0, 255),
+                    cmap="gray",
+                )
+            else:
+                ax.axis("off")
